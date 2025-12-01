@@ -1,0 +1,187 @@
+{
+  "title": "Training E\u00b3 Trade-off Space",
+  "subtitle": "Efficiency \u00d7 Energy \u00d7 Effectiveness",
+  "axes": {
+    "x": {
+      "title": "Training Time (seconds)",
+      "subtitle": "\u2190 Better (Faster)",
+      "type": "linear"
+    },
+    "y": {
+      "title": "Energy (Wh)",
+      "subtitle": "\u2190 Better (Less Energy)",
+      "type": "linear"
+    },
+    "z": {
+      "title": "Accuracy (%)",
+      "subtitle": "\u2192 Better (Higher Accuracy)",
+      "type": "linear"
+    }
+  },
+  "traces": [
+    {
+      "name": "Encoder-only",
+      "type": "scatter3d",
+      "mode": "markers+text",
+      "marker": {
+        "size": 10,
+        "color": "#2ecc71",
+        "symbol": "circle",
+        "line": {
+          "color": "white",
+          "width": 1
+        },
+        "opacity": 0.8
+      },
+      "x": [
+        130.17027539014816,
+        228.1941056251526,
+        50.543966352939606,
+        129.51410454511642
+      ],
+      "y": [
+        25.464204705243052,
+        48.7121049393945,
+        10.848951007930875,
+        24.73108323075485
+      ],
+      "z": [
+        54.70472586763029,
+        54.960179534426445,
+        65.19204242921319,
+        55.36965634472464
+      ],
+      "text": [
+        "bert-base-uncased",
+        "bert-large-uncased",
+        "distilbert-base-uncased",
+        "roberta-base"
+      ],
+      "hovertemplate": "<b>%{text}</b><br>Training Time: %{x:.1f}s<br>Energy: %{y:.1f} Wh<br>Accuracy: %{z:.2f}%<br><extra></extra>",
+      "textposition": "top center",
+      "textfont": {
+        "size": 9,
+        "color": "#2ecc71"
+      }
+    },
+    {
+      "name": "Decoder-only",
+      "type": "scatter3d",
+      "mode": "markers+text",
+      "marker": {
+        "size": 10,
+        "color": "#e74c3c",
+        "symbol": "diamond",
+        "line": {
+          "color": "white",
+          "width": 1
+        },
+        "opacity": 0.8
+      },
+      "x": [
+        113.834910094738,
+        657.4355857372284,
+        337.0403263568878,
+        844.9241139292718
+      ],
+      "y": [
+        22.640256154914297,
+        148.06925858953227,
+        69.15756859992022,
+        196.40239231981136
+      ],
+      "z": [
+        52.01132612701448,
+        69.99126727237733,
+        68.56491163256148,
+        75.09557351450012
+      ],
+      "text": [
+        "gpt2",
+        "llama-3.2-1b",
+        "qwen2.5-0.5b",
+        "qwen2.5-1.5b"
+      ],
+      "hovertemplate": "<b>%{text}</b><br>Training Time: %{x:.1f}s<br>Energy: %{y:.1f} Wh<br>Accuracy: %{z:.2f}%<br><extra></extra>",
+      "textposition": "top center",
+      "textfont": {
+        "size": 9,
+        "color": "#e74c3c"
+      }
+    },
+    {
+      "name": "Encoder-Decoder",
+      "type": "scatter3d",
+      "mode": "markers+text",
+      "marker": {
+        "size": 10,
+        "color": "#3498db",
+        "symbol": "square",
+        "line": {
+          "color": "white",
+          "width": 1
+        },
+        "opacity": 0.8
+      },
+      "x": [
+        129.3909705877304,
+        254.41008126735687,
+        697.4728334546089,
+        244.73996943235397,
+        533.147075355053
+      ],
+      "y": [
+        21.9603356223647,
+        49.33779122416207,
+        115.27412384055046,
+        33.795968864239974,
+        88.76596336090257
+      ],
+      "z": [
+        62.713759634137965,
+        64.67679539419949,
+        60.8086100996017,
+        58.208391983484155,
+        60.79082119775426
+      ],
+      "text": [
+        "bart-base",
+        "flan-t5-base",
+        "flan-t5-large",
+        "t5-base",
+        "t5-large"
+      ],
+      "hovertemplate": "<b>%{text}</b><br>Training Time: %{x:.1f}s<br>Energy: %{y:.1f} Wh<br>Accuracy: %{z:.2f}%<br><extra></extra>",
+      "textposition": "top center",
+      "textfont": {
+        "size": 9,
+        "color": "#3498db"
+      }
+    }
+  ],
+  "metadata": {
+    "total_models": 13,
+    "architectures": {
+      "encoder": 4,
+      "decoder": 4,
+      "encdec": 5
+    },
+    "statistics": {
+      "time_range": {
+        "min": 50.543966352939606,
+        "max": 844.9241139292718,
+        "mean": 334.67833216373737
+      },
+      "energy_range": {
+        "min": 10.848951007930875,
+        "max": 196.40239231981136,
+        "mean": 65.78153865074779
+      },
+      "accuracy_range": {
+        "min": 52.01132612701448,
+        "max": 75.09557351450012,
+        "mean": 61.77600469474043
+      }
+    }
+  }
+}

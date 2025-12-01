@@ -93,6 +93,9 @@
   <script defer src="static/js/bulma-slider.min.js"></script>
   <script defer src="static/js/index.js"></script>
   
+  <!-- Plotly.js for 3D Scatter Plots -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
+  
   <!-- Structured Data for Academic Papers -->
   <script type="application/ld+json">
   {
@@ -207,7 +210,7 @@
                   </div>
 
                   <div class="is-size-5 publication-authors">
-                    <span class="author-block"><sup>1</sup>University of Illinois at Urbana-Champaign<br>2024</span>
+                    <span class="author-block"><sup>1</sup>University of Illinois at Urbana-Champaign<br>2025</span>
                   </div>
 
                   <div class="column has-text-centered">
@@ -250,18 +253,219 @@
 </section>
 
 
-<!-- Teaser Figure: Key Visual -->
-<section class="hero teaser">
+<!-- Interactive 3D Scatter Plot -->
+<section class="hero is-small" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 3rem 0;">
   <div class="container is-max-desktop">
-    <div class="hero-body">
-      <img src="static/images/pareto_frontier.png" alt="Pareto Frontier: Accuracy vs Energy Consumption" style="width: 100%; max-width: 900px; margin: 0 auto; display: block; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);" loading="eager"/>
-      <h2 class="subtitle has-text-centered" style="margin-top: 1.5rem; font-size: 1.1rem; line-height: 1.6;">
-        <strong>The Generality Tax:</strong> Decoder-only models (Red) achieve high generality but pay a <strong>5×–10× energy premium</strong> compared to Encoder-only models (Blue) on Natural Language Understanding tasks.
-      </h2>
+    <div class="hero-body" style="padding: 2rem 1.5rem;">
+      <div style="background: white; border-radius: 16px; padding: 2.5rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        
+        <!-- Header with Toggle -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 class="title is-3" style="margin-bottom: 0.5rem; color: #2d3748;" id="scatter3d-title">
+              E³ Training Trade-off Space
+            </h2>
+            <p class="subtitle is-6" style="color: #718096; margin-bottom: 0;" id="scatter3d-subtitle">
+              Efficiency × Energy × Effectiveness
+            </p>
+          </div>
+          
+          <!-- Toggle Switch -->
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none;">
+              <span style="font-weight: 600; color: #4a5568; font-size: 0.95rem;" id="mode-label-left">Training</span>
+              <div style="position: relative; width: 60px; height: 30px;">
+                <input type="checkbox" id="scatter3d-toggle" style="opacity: 0; width: 0; height: 0;" onchange="toggle3DScatterMode()">
+                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #667eea; transition: .4s; border-radius: 30px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);"></span>
+                <span style="position: absolute; content: ''; height: 22px; width: 22px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></span>
+              </div>
+              <span style="font-weight: 600; color: #4a5568; font-size: 0.95rem;" id="mode-label-right">Inference</span>
+            </label>
+          </div>
+        </div>
+        
+        <!-- 3D Scatter Plot Container -->
+        <div id="scatter3d-plot" style="width: 100%; height: 600px; border-radius: 8px; overflow: hidden;"></div>
+        
+        <!-- Legend Info -->
+        <div style="margin-top: 1.5rem; padding: 1rem; background: #f7fafc; border-radius: 8px; border-left: 4px solid #667eea;">
+          <p style="color: #4a5568; font-size: 0.9rem; margin: 0;">
+            <strong>💡 Tip:</strong> Drag to rotate, scroll to zoom, click and drag with right mouse button to pan. Hover over points to see detailed metrics.
+          </p>
+        </div>
+        
+      </div>
     </div>
   </div>
 </section>
-<!-- End teaser figure -->
+
+<style>
+  /* Toggle Switch Animation */
+  #scatter3d-toggle:checked + span {
+    background-color: #764ba2;
+  }
+  
+  #scatter3d-toggle:checked + span + span {
+    transform: translateX(30px);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    #scatter3d-plot {
+      height: 500px !important;
+    }
+  }
+</style>
+
+<script>
+  // Global variables
+  let currentMode = 'training';
+  let trainingData = null;
+  let inferenceData = null;
+  
+  // Load both datasets
+  async function load3DData() {
+    try {
+      const [trainingResponse, inferenceResponse] = await Promise.all([
+        fetch('static/3d/training_3d_data.json'),
+        fetch('static/3d/inference_3d_data.json')
+      ]);
+      
+      trainingData = await trainingResponse.json();
+      inferenceData = await inferenceResponse.json();
+      
+      // Initial render with training data
+      render3DScatter(trainingData);
+    } catch (error) {
+      console.error('Error loading 3D data:', error);
+      document.getElementById('scatter3d-plot').innerHTML = 
+        '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #e53e3e;">Error loading 3D visualization data</div>';
+    }
+  }
+  
+  // Toggle between training and inference modes
+  function toggle3DScatterMode() {
+    const toggle = document.getElementById('scatter3d-toggle');
+    currentMode = toggle.checked ? 'inference' : 'training';
+    
+    const data = currentMode === 'training' ? trainingData : inferenceData;
+    
+    // Update title and subtitle
+    document.getElementById('scatter3d-title').textContent = data.title;
+    document.getElementById('scatter3d-subtitle').textContent = data.subtitle;
+    
+    // Re-render the plot
+    render3DScatter(data);
+  }
+  
+  // Render the 3D scatter plot
+  function render3DScatter(data) {
+    if (!data) return;
+    
+    const traces = data.traces.map(trace => ({
+      ...trace,
+      type: 'scatter3d',
+      mode: 'markers+text',
+      text: trace.text,
+      textposition: 'top center',
+      hovertemplate: trace.hovertemplate,
+      marker: {
+        ...trace.marker,
+        size: 12,
+        line: {
+          color: 'white',
+          width: 2
+        }
+      }
+    }));
+    
+    const layout = {
+      scene: {
+        xaxis: {
+          title: {
+            text: data.axes.x.title,
+            font: { size: 14, color: '#2d3748', family: 'Inter, sans-serif' }
+          },
+          backgroundcolor: '#f7fafc',
+          gridcolor: '#cbd5e0',
+          showbackground: true,
+          zerolinecolor: '#a0aec0'
+        },
+        yaxis: {
+          title: {
+            text: data.axes.y.title,
+            font: { size: 14, color: '#2d3748', family: 'Inter, sans-serif' }
+          },
+          backgroundcolor: '#f7fafc',
+          gridcolor: '#cbd5e0',
+          showbackground: true,
+          zerolinecolor: '#a0aec0'
+        },
+        zaxis: {
+          title: {
+            text: data.axes.z.title,
+            font: { size: 14, color: '#2d3748', family: 'Inter, sans-serif' }
+          },
+          backgroundcolor: '#f7fafc',
+          gridcolor: '#cbd5e0',
+          showbackground: true,
+          zerolinecolor: '#a0aec0'
+        },
+        camera: {
+          eye: { x: 1.5, y: 1.5, z: 1.3 },
+          center: { x: 0, y: 0, z: 0 }
+        },
+        aspectmode: 'cube'
+      },
+      margin: { l: 0, r: 0, b: 0, t: 40 },
+      paper_bgcolor: 'white',
+      plot_bgcolor: 'white',
+      showlegend: true,
+      legend: {
+        x: 0.02,
+        y: 0.98,
+        bgcolor: 'rgba(255, 255, 255, 0.9)',
+        bordercolor: '#cbd5e0',
+        borderwidth: 1,
+        font: { size: 12, family: 'Inter, sans-serif' }
+      },
+      hovermode: 'closest',
+      font: {
+        family: 'Inter, sans-serif',
+        color: '#2d3748'
+      }
+    };
+    
+    const config = {
+      responsive: true,
+      displayModeBar: true,
+      displaylogo: false,
+      modeBarButtonsToRemove: ['toImage'],
+      modeBarButtonsToAdd: [{
+        name: 'Download as PNG',
+        icon: Plotly.Icons.camera,
+        click: function(gd) {
+          Plotly.downloadImage(gd, {
+            format: 'png',
+            width: 1200,
+            height: 800,
+            filename: `e3_${currentMode}_3d_scatter`
+          });
+        }
+      }]
+    };
+    
+    Plotly.newPlot('scatter3d-plot', traces, layout, config);
+  }
+  
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', load3DData);
+  } else {
+    load3DData();
+  }
+</script>
+<!-- End Interactive 3D Scatter Plot -->
 
 <!-- Paper abstract -->
 <section class="section hero is-light">
@@ -271,19 +475,10 @@
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified" style="font-size: 1.05rem; line-height: 1.8;">
           <p>
-            While <strong>Decoder-only architectures</strong> dominate the Large Language Model (LLM) era with their unprecedented scaling capabilities, our comprehensive <strong>E³ (Efficiency, Energy, Effectiveness) evaluation</strong> reveals that they suffer from massive inefficiencies in specific deployment scenarios. Through systematic benchmarking across three transformer paradigms—<strong>Encoder-only (BERT)</strong>, <strong>Decoder-only (GPT-2)</strong>, and <strong>Encoder-Decoder (T5)</strong>—we quantify three critical phenomena:
+            This report presents a systematic comparison of three Transformer architectures—<strong>Encoder-only (BERT family)</strong>, <strong>Decoder-only (GPT family)</strong>, and <strong>Encoder-Decoder (T5/BART family)</strong>—across three critical dimensions: <strong>Efficiency</strong> (time), <strong>Energy</strong> (power consumption), and <strong>Effectiveness</strong> (task performance). Using the E³ Mini-Benchmark framework on NVIDIA Tesla V100 GPUs with precise energy measurements, we reveal fundamental trade-offs that challenge the conventional wisdom of architecture selection.
           </p>
           <p style="margin-top: 1rem;">
-            <strong>(1) The Generality Tax:</strong> Decoder-only models consume 5×–10× more energy per prediction on classification tasks compared to specialized encoder architectures, despite achieving comparable accuracy.
-          </p>
-          <p style="margin-top: 0.5rem;">
-            <strong>(2) The KV-Cache Bottleneck:</strong> In long-context inference (>2K tokens), decoder-only models experience exponential VRAM growth, hitting out-of-memory errors at 4K tokens on V100 GPUs, while encoder models scale linearly.
-          </p>
-          <p style="margin-top: 0.5rem;">
-            <strong>(3) Sample Inefficiency:</strong> In data-scarce regimes (<1000 samples), encoder inductive biases lead to 2× faster convergence during domain adaptation compared to generative pretraining.
-          </p>
-          <p style="margin-top: 1rem;">
-            Our findings challenge the "one-size-fits-all" narrative in neural architecture selection and provide actionable insights for sustainable AI system design.
+            Our key finding: <strong>no architecture simultaneously optimizes all three dimensions</strong>. The "winner" depends critically on deployment constraints—latency budgets favor Decoder-only, energy budgets favor Encoder-Decoder, and quality requirements determine the optimal choice. Most surprisingly, we demonstrate that <strong>faster does not mean greener</strong>: GPT-2 achieves 52% higher throughput than T5 but consumes 2× more energy per token, revealing a crucial efficiency-energy decoupling overlooked in current benchmarks.
           </p>
         </div>
       </div>
@@ -293,14 +488,17 @@
 <!-- End paper abstract -->
 
 
-<!-- Methodology: The E³ Framework -->
+<!-- Introduction -->
 <section class="hero is-small">
   <div class="hero-body">
     <div class="container is-max-desktop">
-      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2rem;">The E³ Evaluation Framework</h2>
-      <div class="content" style="font-size: 1rem; line-height: 1.7;">
-        <p class="has-text-centered" style="margin-bottom: 2.5rem; font-size: 1.1rem; color: #4a5568;">
-          We propose a <strong>three-dimensional assessment</strong> protocol that goes beyond traditional accuracy metrics to capture the full lifecycle cost of neural architectures:
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2rem;">1. Introduction</h2>
+      
+      <!-- The E³ Framework -->
+      <div class="content" style="font-size: 1rem; line-height: 1.7; margin-bottom: 3rem;">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">1.1 The E³ Framework</h3>
+        <p style="margin-bottom: 1.5rem;">
+          Modern language model evaluation focuses predominantly on accuracy metrics, yet real-world deployment faces hard constraints across three orthogonal dimensions:
         </p>
         
         <div class="columns is-multiline" style="margin-top: 2rem;">
@@ -308,12 +506,11 @@
             <div class="box" style="height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 2rem;">
               <h3 class="title is-4" style="color: white; margin-bottom: 1rem;">
                 <span class="icon" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">⚡</span>
-                Efficiency
+                Efficiency (E₁)
               </h3>
               <p style="font-size: 0.95rem; line-height: 1.6;">
-                <strong>Throughput:</strong> Tokens processed per second<br>
-                <strong>Latency:</strong> Time to first token & end-to-end inference<br>
-                <strong>Context Scaling:</strong> Performance degradation with sequence length
+                <strong>Training:</strong> Tokens processed per second, wall-clock time to convergence<br><br>
+                <strong>Inference:</strong> TTFT (Time-To-First-Token), TBT (Time-Between-Tokens), throughput
               </p>
             </div>
           </div>
@@ -322,12 +519,11 @@
             <div class="box" style="height: 100%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 12px; padding: 2rem;">
               <h3 class="title is-4" style="color: white; margin-bottom: 1rem;">
                 <span class="icon" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">🔋</span>
-                Energy
+                Energy (E₂)
               </h3>
               <p style="font-size: 0.95rem; line-height: 1.6;">
-                <strong>Power Draw:</strong> Instantaneous GPU wattage (Watts)<br>
-                <strong>Total Energy:</strong> Cumulative consumption per task (kWh)<br>
-                <strong>Carbon Footprint:</strong> CO₂ equivalent emissions
+                <strong>Training:</strong> Total energy to convergence (kWh)<br><br>
+                <strong>Inference:</strong> Energy per sample/token (Joules)
               </p>
             </div>
           </div>
@@ -336,104 +532,251 @@
             <div class="box" style="height: 100%; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border-radius: 12px; padding: 2rem;">
               <h3 class="title is-4" style="color: white; margin-bottom: 1rem;">
                 <span class="icon" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">🎯</span>
-                Effectiveness
+                Effectiveness (E₃)
               </h3>
               <p style="font-size: 0.95rem; line-height: 1.6;">
-                <strong>Task Performance:</strong> SuperGLUE accuracy & F1 scores<br>
-                <strong>Convergence Speed:</strong> Training steps to target performance<br>
-                <strong>Generalization:</strong> Cross-domain transfer capability
+                <strong>Task accuracy:</strong> SuperGLUE, MMLU<br><br>
+                <strong>Capabilities:</strong> Zero-shot and few-shot learning
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Motivation -->
+      <div class="content" style="font-size: 1rem; line-height: 1.7; margin-bottom: 3rem;">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">1.2 Motivation</h3>
+        <p>Three trends motivate this comprehensive analysis:</p>
+        <ol style="margin-left: 1.5rem;">
+          <li><strong>Architectural consolidation:</strong> Decoder-only models (GPT, LLaMA, Qwen) increasingly dominate despite architectural alternatives</li>
+          <li><strong>Sustainability concerns:</strong> AI's carbon footprint demands energy-conscious design</li>
+          <li><strong>Deployment diversity:</strong> Edge devices, cloud servers, and mobile platforms impose different constraints</li>
+        </ol>
+        <p style="margin-top: 1.5rem; padding: 1.5rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+          <strong>Central Question:</strong> <em>When one dimension is constrained (latency, energy, or accuracy), what is the optimal architectural choice?</em>
+        </p>
+      </div>
+
+      <!-- Experimental Setup -->
+      <div class="content" style="font-size: 1rem; line-height: 1.7;">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">1.3 Experimental Setup</h3>
+        
+        <p><strong>Hardware Environment:</strong></p>
+        <ul style="margin-left: 1.5rem; margin-bottom: 1.5rem;">
+          <li>GPU: NVIDIA Tesla V100-SXM2-32GB</li>
+          <li>CUDA Version: 12.8</li>
+          <li>Precision: FP16 (no BF16, no FlashAttention for fair comparison)</li>
+        </ul>
+
+        <p><strong>Model Selection</strong> (similar parameter scales):</p>
+        <div class="table-container" style="margin: 1.5rem 0;">
+          <table class="table is-striped is-fullwidth">
+            <thead>
+              <tr>
+                <th>Architecture</th>
+                <th>Models</th>
+                <th>Parameters</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Encoder-only</strong></td>
+                <td>BERT-Base, RoBERTa-Base, DistilBERT</td>
+                <td>66M-110M</td>
+              </tr>
+              <tr>
+                <td><strong>Decoder-only</strong></td>
+                <td>GPT-2, LLaMA-3.2-1B, Qwen2.5-0.5/1.5B</td>
+                <td>124M-1.5B</td>
+              </tr>
+              <tr>
+                <td><strong>Encoder-Decoder</strong></td>
+                <td>T5-Base/Large, FLAN-T5-Base/Large, BART-Base</td>
+                <td>140M-780M</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>Measurement Protocol:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>Real-time GPU power monitoring via NVML (∫ Power(t) dt)</li>
+          <li>Token-by-token latency breakdown (TTFT vs TBT)</li>
+          <li>Multiple seeds for statistical significance</li>
+          <li>LoRA fine-tuning for parameter efficiency</li>
+        </ul>
+      </div>
     </div>
   </div>
 </section>
-<!-- End Methodology -->
+<!-- End Introduction -->
 
 
 
 
-<!-- Experimental Results -->
+<!-- Section 2: SuperGLUE Fine-tuning Training Phase Analysis -->
 <section class="hero is-small is-light">
   <div class="hero-body">
     <div class="container is-max-desktop">
-      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">Experimental Results</h2>
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">2. SuperGLUE Fine-tuning: Training Phase Analysis</h2>
       
-      <!-- Experiment 1: The Cost of Generality -->
+      <!-- 2.1 Task Performance -->
       <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">
-          <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-            Experiment 1: The Cost of Generality
-          </span>
-        </h3>
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">2.1 Task Performance</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p>We fine-tuned all models on four SuperGLUE tasks: BoolQ (question answering), RTE (textual entailment), WiC (word sense), and CB (commitment bank).</p>
+          
+          <div class="columns" style="margin-top: 2rem;">
+            <div class="column is-half">
+              <figure class="image">
+                <img src="static/images/training_accuracy_by_arch.png" alt="SuperGLUE accuracy by architecture and task" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+                <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 1:</strong> SuperGLUE accuracy by architecture and task. T5 consistently outperforms on understanding tasks.</figcaption>
+              </figure>
+            </div>
+            <div class="column is-half">
+              <figure class="image">
+                <img src="static/images/training_superglue_perf.png" alt="Model-level performance ranking" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+                <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 2:</strong> Model-level performance ranking. T5-Base achieves the highest average accuracy across tasks.</figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <h4 style="color: #2d3748; margin-top: 2rem; margin-bottom: 1rem;">Key Findings</h4>
+          <p><strong>Task-level Results:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li><strong>BoolQ</strong> (Question Answering): T5-Base 77.1% >> BERT-Base 63.9% >> GPT-2 61.1%</li>
+            <li><strong>RTE</strong> (Textual Entailment): T5 53.1%, BERT 52.7%, GPT-2 52.7% (statistical tie)</li>
+            <li><strong>WiC</strong> (Word Sense): T5 61.6% > BERT 57.5% > GPT-2 53.1%</li>
+            <li><strong>CB</strong> (Commitment): All models struggle (~41-45%, near random)</li>
+          </ul>
+          <div style="margin-top: 1.5rem; padding: 1.5rem; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 6px;">
+            <strong>Effectiveness Ranking:</strong> T5 > BERT > GPT-2 (average gap: 7.7pp and 12.7pp respectively)
+          </div>
+        </div>
+      </div>
+
+      <!-- 2.2 Training Efficiency -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">2.2 Training Efficiency</h3>
         <div class="columns">
           <div class="column is-two-thirds">
             <figure class="image">
-              <img src="static/images/results_energy.png" alt="Energy per Sample: Classification Task Comparison" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <img src="static/images/training_efficiency.png" alt="Training time vs accuracy scatter plot" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 3:</strong> Training time vs accuracy scatter plot. Lower-left corner is ideal (fast + accurate).</figcaption>
             </figure>
           </div>
-          <div class="column is-one-third" style="display: flex; align-items: center;">
-            <div class="content">
-              <p style="font-size: 1rem; line-height: 1.7; color: #4a5568;">
-                <strong style="color: #2d3748;">Key Insight:</strong> Generative classification is computationally expensive—decoder-only models require <strong>8.7× more energy</strong> than BERT to achieve similar accuracy on sentiment analysis tasks.
-              </p>
-              <p style="font-size: 0.9rem; margin-top: 1rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
-                💡 <strong>Implication:</strong> Task-specific architectures remain competitive for production NLU workloads.
-              </p>
+          <div class="column is-one-third">
+            <div class="content" style="font-size: 1rem; line-height: 1.7;">
+              <p><strong>Time to Convergence</strong> (BoolQ, 5 epochs):</p>
+              <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+                <li><strong>GPT-2:</strong> 303 seconds ✓ (fastest)</li>
+                <li><strong>BERT-Base:</strong> 309 seconds</li>
+                <li><strong>T5-Base:</strong> 536 seconds (77% slower)</li>
+              </ul>
+              <div style="margin-top: 1.5rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; font-size: 0.9rem;">
+                <strong>Why is T5 slower?</strong><br>
+                1. Dual attention mechanisms<br>
+                2. Larger parameter count (220M vs 110-124M)<br>
+                3. More complex forward pass
+              </div>
+              <p style="margin-top: 1rem;"><strong>Efficiency Ranking:</strong> GPT-2 ≈ BERT >> T5</p>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- Experiment 2: The Context Stress Test -->
+      <!-- 2.3 Memory Footprint -->
       <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">
-          <span style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-            Experiment 2: The Context Stress Test
-          </span>
-        </h3>
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">2.3 Memory Footprint</h3>
         <div class="columns">
           <div class="column is-two-thirds">
             <figure class="image">
-              <img src="static/images/results_vram.png" alt="VRAM Growth: Context Length Scaling" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <img src="static/images/training_memory_usage.png" alt="Peak GPU memory usage by architecture" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 4:</strong> Peak GPU memory usage by architecture.</figcaption>
             </figure>
           </div>
-          <div class="column is-one-third" style="display: flex; align-items: center;">
-            <div class="content">
-              <p style="font-size: 1rem; line-height: 1.7; color: #4a5568;">
-                <strong style="color: #2d3748;">Key Insight:</strong> Decoder-only models hit <strong>OOM at 4K tokens</strong> on V100 GPUs due to quadratic KV-cache growth, while encoder models scale linearly.
-              </p>
-              <p style="font-size: 0.9rem; margin-top: 1rem; padding: 1rem; background: #fecaca; border-left: 4px solid #ef4444; border-radius: 6px;">
-                ⚠️ <strong>Implication:</strong> Long-context applications require architectural innovations (e.g., sparse attention, memory-efficient transformers).
-              </p>
+          <div class="column is-one-third">
+            <div class="content" style="font-size: 1rem; line-height: 1.7;">
+              <p><strong>Memory Requirements:</strong></p>
+              <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+                <li><strong>BERT-Base:</strong> 5.46 GB (bidirectional attention is memory-intensive)</li>
+                <li><strong>GPT-2:</strong> 7.86 GB (larger hidden states due to causal masking)</li>
+                <li><strong>T5-Base:</strong> 7.17 GB (dual stacks but parameter sharing helps)</li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- Experiment 3: Training Convergence -->
+      <!-- 2.4 Training Energy Analysis -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">2.4 Training Energy Analysis</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p><strong>Energy Consumption</strong> (BoolQ, full training):</p>
+          <div class="table-container" style="margin: 1.5rem 0;">
+            <table class="table is-striped is-fullwidth">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Training Time</th>
+                  <th>Avg Power</th>
+                  <th>Total Energy</th>
+                  <th>Relative</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>GPT-2</strong></td>
+                  <td>303s</td>
+                  <td>792W</td>
+                  <td>0.067 kWh</td>
+                  <td>1.0× (baseline)</td>
+                </tr>
+                <tr>
+                  <td><strong>BERT</strong></td>
+                  <td>309s</td>
+                  <td>881W</td>
+                  <td>0.076 kWh</td>
+                  <td>1.13×</td>
+                </tr>
+                <tr>
+                  <td><strong>T5</strong></td>
+                  <td>536s</td>
+                  <td>583W</td>
+                  <td>0.087 kWh</td>
+                  <td>1.30×</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding: 1.5rem; background: #fecaca; border-left: 4px solid #ef4444; border-radius: 6px;">
+            <strong>The Energy Paradox:</strong> T5 has the <em>lowest</em> average power draw (583W) but the <em>highest</em> total energy (0.087 kWh) because training takes 77% longer.
+          </div>
+          <p style="margin-top: 1rem;"><strong>Energy Ranking:</strong> GPT-2 > BERT > T5</p>
+        </div>
+      </div>
+
+      <!-- 2.5 Training E³ Bubble Chart -->
       <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">
-          <span style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-            Experiment 3: Training Convergence
-          </span>
-        </h3>
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">2.5 Training E³ Bubble Chart</h3>
         <div class="columns">
           <div class="column is-two-thirds">
             <figure class="image">
-              <img src="static/images/results_loss_curves.png" alt="Normalized Loss Curves: Training Efficiency" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <img src="static/images/e3_training_bubble_chart.png" alt="Training E³ trade-off space" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 5:</strong> Training E³ trade-off space. X-axis: training time (lower better), Y-axis: accuracy (higher better), Bubble size: energy consumption (smaller better).</figcaption>
             </figure>
           </div>
-          <div class="column is-one-third" style="display: flex; align-items: center;">
-            <div class="content">
-              <p style="font-size: 1rem; line-height: 1.7; color: #4a5568;">
-                <strong style="color: #2d3748;">Key Insight:</strong> Encoder inductive bias leads to <strong>2× faster convergence</strong> in domain adaptation scenarios with limited data (<1000 samples).
-              </p>
-              <p style="font-size: 0.9rem; margin-top: 1rem; padding: 1rem; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 6px;">
-                📊 <strong>Implication:</strong> Pretraining paradigm choice significantly impacts fine-tuning efficiency in low-resource settings.
-              </p>
+          <div class="column is-one-third">
+            <div class="content" style="font-size: 1rem; line-height: 1.7;">
+              <p>This visualization reveals the fundamental trilemma:</p>
+              <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+                <li><strong>GPT-2:</strong> Wins on E₁ (speed) and E₂ (energy), sacrifices E₃ (accuracy)</li>
+                <li><strong>T5:</strong> Wins on E₃ (accuracy), loses on E₁ and E₂</li>
+                <li><strong>BERT:</strong> Middle ground but dominated on all dimensions</li>
+              </ul>
+              <div style="margin-top: 1.5rem; padding: 1rem; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 0.9rem;">
+                <strong>Pareto-optimal set:</strong> {GPT-2, T5}<br>BERT is strictly dominated.
+              </div>
             </div>
           </div>
         </div>
@@ -441,55 +784,89 @@
     </div>
   </div>
 </section>
-<!-- End Experimental Results -->
+<!-- End Section 2 -->
 
 
-<!-- Key Takeaways -->
+<!-- Section 3: Few-shot Evaluation -->
 <section class="hero is-small">
   <div class="hero-body">
     <div class="container is-max-desktop">
-      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2rem;">Key Takeaways</h2>
-      <div class="content" style="font-size: 1.05rem; line-height: 1.8;">
-        <div class="box" style="background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); border-radius: 12px; padding: 2.5rem;">
-          <div class="columns is-multiline">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">3. Few-shot Evaluation: Zero/Few-shot Capabilities</h2>
+      
+      <!-- 3.1 Learning Curves Across Shot Counts -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">3.1 Learning Curves Across Shot Counts</h3>
+        
+        <div class="columns" style="margin-bottom: 2rem;">
             <div class="column is-half">
-              <h4 style="color: #2d3748; font-weight: 700; margin-bottom: 1rem;">
-                <span style="color: #667eea; font-size: 1.5rem; margin-right: 0.5rem;">🏆</span>
-                Best for Production NLU
-              </h4>
-              <p style="color: #4a5568;">
-                <strong>Encoder-only (BERT)</strong> models excel in classification, NER, and Q&A with minimal energy overhead.
-              </p>
+            <figure class="image">
+              <img src="static/images/fewshot_curves.png" alt="Few-shot learning curves" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 6:</strong> Few-shot learning curves (0/5/10-shot) for key models on major tasks.</figcaption>
+            </figure>
+          </div>
+            <div class="column is-half">
+            <figure class="image">
+              <img src="static/images/fewshot_curves_full.png" alt="Complete few-shot curves" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 7:</strong> Complete few-shot curves across all models and tasks.</figcaption>
+            </figure>
+          </div>
             </div>
             
-            <div class="column is-half">
-              <h4 style="color: #2d3748; font-weight: 700; margin-bottom: 1rem;">
-                <span style="color: #f093fb; font-size: 1.5rem; margin-right: 0.5rem;">🚀</span>
-                Best for Versatility
-              </h4>
-              <p style="color: #4a5568;">
-                <strong>Decoder-only (GPT-2)</strong> models provide unmatched flexibility for few-shot learning and creative generation.
-              </p>
+        <h4 style="color: #2d3748; margin-bottom: 1rem;">Zero-shot Performance (MMLU)</h4>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p><strong>Accuracy at 0-shot:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>BERT-Base: 23.1% (near random, ~25% for 4-choice)</li>
+            <li>GPT-2: ~26-28%</li>
+            <li>T5-Base: ~30-32%</li>
+            <li>LLaMA-3.2-1B: 35-40%</li>
+            <li>Qwen2.5-1.5B: 40-45% ✓ (best)</li>
+          </ul>
+          <div style="margin-top: 1.5rem; padding: 1.5rem; background: #fecaca; border-left: 4px solid #ef4444; border-radius: 6px;">
+            <strong>Key Insight:</strong> Encoder-only models fundamentally struggle with generative zero-shot tasks due to lack of autoregressive pre-training.
+          </div>
             </div>
             
+        <div class="columns" style="margin-top: 2rem;">
             <div class="column is-half">
-              <h4 style="color: #2d3748; font-weight: 700; margin-bottom: 1rem;">
-                <span style="color: #4facfe; font-size: 1.5rem; margin-right: 0.5rem;">⚖️</span>
-                Best for Balanced Workloads
-              </h4>
-              <p style="color: #4a5568;">
-                <strong>Encoder-Decoder (T5)</strong> architectures offer a middle ground for translation, summarization, and seq2seq tasks.
-              </p>
+            <figure class="image">
+              <img src="static/images/fewshot_mmlu_0shot_perf.png" alt="Zero-shot MMLU performance" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 8:</strong> Zero-shot MMLU performance breakdown by model.</figcaption>
+            </figure>
+          </div>
+            <div class="column is-half">
+            <figure class="image">
+              <img src="static/images/fewshot_mmlu_5shot_perf.png" alt="5-shot MMLU performance" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 9:</strong> 5-shot MMLU performance showing improvement from few-shot examples.</figcaption>
+            </figure>
+          </div>
+        </div>
             </div>
             
-            <div class="column is-half">
-              <h4 style="color: #2d3748; font-weight: 700; margin-bottom: 1rem;">
-                <span style="color: #f59e0b; font-size: 1.5rem; margin-right: 0.5rem;">🌍</span>
-                Sustainability Matters
-              </h4>
-              <p style="color: #4a5568;">
-                The "bigger is better" paradigm comes at an environmental cost—<strong>architecture selection is a sustainability lever</strong>.
-              </p>
+      <!-- 3.2 Few-shot Learning Capability -->
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">3.2 Few-shot Learning Capability</h3>
+        <div class="columns">
+          <div class="column is-two-thirds">
+            <figure class="image">
+              <img src="static/images/fewshot_heatmap.png" alt="Model-task performance heatmap" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 10:</strong> Model-task performance heatmap showing architecture-task affinity.</figcaption>
+            </figure>
+          </div>
+          <div class="column is-one-third">
+            <div class="content" style="font-size: 1rem; line-height: 1.7;">
+              <p><strong>Performance Gains</strong> (0-shot → 10-shot):</p>
+              <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+                <li><strong>Decoder-only:</strong> +8-12% (moderate, already good at zero-shot)</li>
+                <li><strong>Encoder-Decoder:</strong> +12-18% (largest gains, benefits most from examples)</li>
+                <li><strong>Encoder-only:</strong> +3-6% (limited, architecture mismatch)</li>
+              </ul>
+              <div style="margin-top: 1.5rem; padding: 1rem; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 0.9rem;">
+                <strong>Architecture-Task Affinity:</strong><br>
+                • Encoder-only: Strong on classification, weak on generation<br>
+                • Decoder-only: Balanced, strong zero-shot baseline<br>
+                • Encoder-Decoder: Strongest with examples, excels at structured generation
+              </div>
             </div>
           </div>
         </div>
@@ -497,12 +874,781 @@
     </div>
   </div>
 </section>
-<!-- End Key Takeaways -->
+<!-- End Section 3 -->
+
+<!-- Section 4: Inference Benchmarking -->
+<section class="hero is-small is-light">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">4. Inference Benchmarking: Latency and Throughput</h2>
+      
+      <!-- 4.1 Overall Performance -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">4.1 Overall Performance</h3>
+        <div class="columns">
+            <div class="column is-half">
+            <figure class="image">
+              <img src="static/images/inference_performance.png" alt="Inference performance overview" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 11:</strong> Inference performance overview across models.</figcaption>
+            </figure>
+          </div>
+          <div class="column is-half">
+            <figure class="image">
+              <img src="static/images/inference_memory_tradeoff.png" alt="Memory usage vs inference latency" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 12:</strong> Memory usage vs inference latency trade-off.</figcaption>
+            </figure>
+          </div>
+        </div>
+            </div>
+            
+      <!-- 4.2 Context Length Scalability -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">4.2 Context Length Scalability</h3>
+        <div class="columns">
+          <div class="column is-two-thirds">
+            <figure class="image">
+              <img src="static/images/latency_curve.png" alt="Latency curves as context length increases" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 13:</strong> Latency curves as context length increases (128 → 1024 tokens).</figcaption>
+            </figure>
+          </div>
+          <div class="column is-one-third">
+            <div class="content" style="font-size: 1rem; line-height: 1.7;">
+              <p><strong>Scalability Patterns:</strong></p>
+              <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+                <li><strong>GPT-2:</strong> Near-constant TTFT (~10ms) across context lengths (prefill caching efficient)</li>
+                <li><strong>T5:</strong> Higher baseline TTFT (~23ms) but stable (encoder processes once, caches)</li>
+                <li><strong>BERT:</strong> Linear growth with sequence length (full bidirectional attention)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4.3 Fine-grained Latency Breakdown -->
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">4.3 Fine-grained Latency Breakdown: TTFT vs TBT</h3>
+        
+        <figure class="image" style="margin-bottom: 2rem;">
+          <img src="static/images/ttft_tbt_curves.png" alt="TTFT and TBT across context lengths" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+          <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 14:</strong> Time-To-First-Token (TTFT) and Time-Between-Tokens (TBT) across context lengths.</figcaption>
+        </figure>
+
+        <div class="columns" style="margin-bottom: 2rem;">
+            <div class="column is-half">
+            <div class="box" style="background: #f0f9ff; border-left: 4px solid #3b82f6;">
+              <h4 style="color: #2d3748; font-weight: 700;">GPT-2 Latency Profile (@ 512 tokens):</h4>
+              <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                <li>TTFT: 10.1 ms</li>
+                <li>TBT: 10.0 ms</li>
+                <li>Throughput: 94.9 tokens/sec</li>
+              </ul>
+            </div>
+          </div>
+          <div class="column is-half">
+            <div class="box" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+              <h4 style="color: #2d3748; font-weight: 700;">T5-Base Latency Profile (@ 512 tokens):</h4>
+              <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                <li>TTFT: 23.0 ms (including encoder 9.0ms + first decode 14.0ms)</li>
+                <li>TBT: 14.5 ms (45% slower per token)</li>
+                <li>Throughput: 62.3 tokens/sec</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="columns">
+          <div class="column is-half">
+            <figure class="image">
+              <img src="static/images/latency_composition.png" alt="Latency composition breakdown" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 15:</strong> Latency composition breakdown showing encoder vs decoder phases for T5.</figcaption>
+            </figure>
+          </div>
+          <div class="column is-half">
+            <figure class="image">
+              <img src="static/images/latency_bar_chart_512.png" alt="Comparative latency at 512 tokens" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 16:</strong> Comparative latency breakdown at 512 context length.</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.5rem; padding: 1.5rem; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 6px;">
+          <strong>Critical Observation:</strong> T5's encoder latency (~9ms) is <strong>independent of context length</strong> due to parallel processing, while decoder is sequential.
+          <br><br>
+          <strong>Efficiency Ranking:</strong> GPT-2 >> T5 (GPT-2 is 1.52× faster on throughput)
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Section 4 -->
+
+<!-- Section 5: The E³ Trade-off Core Findings -->
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">5. The E³ Trade-off: Core Findings</h2>
+      
+      <!-- 5.1 Inference E³ Bubble Chart -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">5.1 Inference E³ Bubble Chart</h3>
+        <div class="columns">
+          <div class="column is-two-thirds">
+            <figure class="image">
+              <img src="static/images/tradeoff_bubble_chart.png" alt="Inference E³ trade-off space" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 17:</strong> Inference E³ trade-off space. X-axis: inference latency (lower better), Y-axis: accuracy (higher better), Bubble size: energy per sample (smaller better).</figcaption>
+            </figure>
+          </div>
+          <div class="column is-one-third">
+            <div class="content" style="font-size: 1rem; line-height: 1.7;">
+              <h4>Pareto Frontier Analysis:</h4>
+              <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+                <li><strong>Lower-left corner:</strong> Ideal (low latency, high accuracy, small bubble)</li>
+                <li><strong>GPT-2 position:</strong> Low latency but larger bubbles (more energy)</li>
+                <li><strong>T5 position:</strong> Higher latency but smaller bubbles (less energy)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5.2 The Efficiency-Energy Decoupling -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">5.2 The Efficiency-Energy Decoupling</h3>
+        
+        <figure class="image" style="margin-bottom: 2rem;">
+          <img src="static/images/efficiency_energy_decoupling.png" alt="Throughput vs energy-per-token scatter" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+          <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 18:</strong> Throughput vs energy-per-token scatter plot. This proves that faster ≠ greener.</figcaption>
+        </figure>
+
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p><strong>Measured Data:</strong></p>
+          <div class="table-container" style="margin: 1.5rem 0;">
+            <table class="table is-striped is-fullwidth">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Throughput</th>
+                  <th>Energy/Token</th>
+                  <th>Efficiency Rank</th>
+                  <th>Energy Rank</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>GPT-2</strong></td>
+                  <td>95 tok/s</td>
+                  <td>2.40 J/tok</td>
+                  <td>1st (faster)</td>
+                  <td>2nd (wasteful)</td>
+                </tr>
+                <tr>
+                  <td><strong>T5</strong></td>
+                  <td>62 tok/s</td>
+                  <td>1.14 J/tok</td>
+                  <td>2nd (slower)</td>
+                  <td>1st (greener)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="padding: 2rem; background: #fecaca; border: 3px solid #ef4444; border-radius: 8px; margin-top: 2rem;">
+            <h4 style="color: #7f1d1d; font-weight: 700; font-size: 1.2rem; margin-bottom: 1rem;">🔥 The Decoupling</h4>
+            <p style="color: #7f1d1d; font-size: 1.1rem; line-height: 1.8;">
+              GPT-2 achieves <strong>53% higher throughput</strong> but consumes <strong>2.1× more energy per token</strong>.
+              </p>
+            </div>
+            
+          <div style="margin-top: 2rem;">
+            <h4>Why?</h4>
+            <ol style="margin-left: 1.5rem;">
+              <li><strong>Power draw difference:</strong> GPT-2 draws 211W vs T5's 201W during inference</li>
+              <li><strong>Architectural efficiency:</strong> T5's encoder-decoder separation enables better energy utilization</li>
+              <li><strong>Parameter sharing:</strong> T5 shares embeddings between encoder and decoder</li>
+              <li><strong>Computation pattern:</strong> T5's encoder processes once; GPT-2 reprocesses at every token</li>
+            </ol>
+          </div>
+
+          <div style="margin-top: 1.5rem; padding: 1.5rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+            <strong>Implication:</strong> <strong>Optimizing for speed ≠ Optimizing for sustainability</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5.3 Multi-objective Pareto Frontiers -->
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">5.3 Multi-objective Pareto Frontiers</h3>
+        
+        <figure class="image" style="margin-bottom: 2rem;">
+          <img src="static/images/pareto_frontier_combined.png" alt="Four Pareto frontiers" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+          <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 19:</strong> Four Pareto frontiers showing pairwise trade-offs.</figcaption>
+        </figure>
+
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p><strong>Pareto-Optimal Solutions:</strong></p>
+          <div class="table-container" style="margin: 1.5rem 0;">
+            <table class="table is-striped is-fullwidth">
+              <thead>
+                <tr>
+                  <th>Objective Pair</th>
+                  <th>Pareto Set</th>
+                  <th>Interpretation</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>E₁ vs E₃ (Training)</td>
+                  <td>{GPT-2, T5}</td>
+                  <td>GPT-2 for speed, T5 for accuracy</td>
+                </tr>
+                <tr>
+                  <td>E₂ vs E₃ (Training)</td>
+                  <td>{GPT-2, T5}</td>
+                  <td>GPT-2 for energy, T5 for accuracy</td>
+                </tr>
+                <tr>
+                  <td>E₁ vs E₂ (Inference)</td>
+                  <td>{GPT-2, T5}</td>
+                  <td>No dominance; task-dependent</td>
+                </tr>
+                <tr>
+                  <td>E₁ vs E₃ (Inference)</td>
+                  <td>{T5}</td>
+                  <td>T5 dominates when quality matters</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding: 1.5rem; background: #fecaca; border-left: 4px solid #ef4444; border-radius: 6px;">
+            <strong>BERT's Fate:</strong> Dominated on all frontiers except pure classification tasks.
+          </div>
+        </div>
+      </div>
+
+      <!-- 5.4 Lifecycle Energy Analysis -->
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">5.4 Lifecycle Energy Analysis</h3>
+        
+        <div class="columns">
+          <div class="column is-two-thirds">
+            <figure class="image">
+              <img src="static/images/lifecycle_energy_breakdown.png" alt="Lifecycle energy breakdown" style="border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" loading="lazy"/>
+              <figcaption class="has-text-centered" style="margin-top: 0.5rem; font-size: 0.9rem; color: #4a5568;"><strong>Figure 20:</strong> Lifecycle energy breakdown at 1 million inferences.</figcaption>
+            </figure>
+          </div>
+          <div class="column is-one-third">
+            <div class="content" style="font-size: 1rem; line-height: 1.7;">
+              <p><strong>Simulated Deployment</strong> (1M inferences):</p>
+              <div class="table-container" style="margin: 1rem 0; font-size: 0.9rem;">
+                <table class="table is-striped is-fullwidth" style="font-size: 0.85rem;">
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>GPT-2</strong></td>
+                      <td>33.4 kWh</td>
+                    </tr>
+                    <tr>
+                      <td><strong>T5</strong></td>
+                      <td>15.9 kWh</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top: 1.5rem; padding: 1rem; background: #d1fae5; border-left: 4px solid #10b981; border-radius: 6px; font-size: 0.9rem;">
+                <strong>Critical:</strong> T5 saves <strong>52% energy</strong> at scale despite higher training cost.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Section 5 -->
+
+<!-- Section 6: Architecture-Specific Deep Dive -->
+<section class="hero is-small is-light">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">6. Architecture-Specific Deep Dive</h2>
+      
+      <!-- 6.1 Encoder-only (BERT) -->
+      <div class="box" style="margin-bottom: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);">
+        <h3 class="title is-4" style="color: #1e3a8a; margin-bottom: 1.5rem;">6.1 Encoder-only (BERT): The Specialist</h3>
+        <div class="columns">
+            <div class="column is-half">
+            <h4 style="color: #1e3a8a; font-weight: 700; margin-bottom: 0.5rem;">✅ Strengths</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li>Excellent at classification/NLU tasks (BoolQ: 63.9%)</li>
+              <li>Bidirectional context understanding</li>
+              <li>Fast inference on short sequences</li>
+            </ul>
+            <h4 style="color: #1e3a8a; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem;">❌ Weaknesses</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li>Cannot generate text (architectural limitation)</li>
+              <li>Poor zero-shot performance (23.1% on MMLU)</li>
+              <li>High memory usage (bidirectional attention)</li>
+            </ul>
+          </div>
+          <div class="column is-half">
+            <h4 style="color: #1e3a8a; font-weight: 700; margin-bottom: 0.5rem;">🎯 Optimal Use Cases</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li>Pure classification (sentiment, NER, QA)</li>
+              <li>When generation is not needed</li>
+              <li>Real-time classification with short inputs</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6.2 Decoder-only (GPT) -->
+      <div class="box" style="margin-bottom: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);">
+        <h3 class="title is-4" style="color: #831843; margin-bottom: 1.5rem;">6.2 Decoder-only (GPT): The Generalist</h3>
+        <div class="columns">
+          <div class="column is-half">
+            <h4 style="color: #831843; font-weight: 700; margin-bottom: 0.5rem;">✅ Strengths</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li>Fastest training (303s vs 536s)</li>
+              <li>Lowest training energy (0.067 kWh)</li>
+              <li>Best zero-shot capabilities</li>
+              <li>Fastest inference (95 tok/s)</li>
+              <li>Universal architecture</li>
+            </ul>
+            <h4 style="color: #831843; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem;">❌ Weaknesses</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li><strong>Highest inference energy</strong> (2.40 J/tok)</li>
+              <li>Lower task-specific accuracy</li>
+            </ul>
+          </div>
+          <div class="column is-half">
+            <h4 style="color: #831843; font-weight: 700; margin-bottom: 0.5rem;">🎯 Optimal Use Cases</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li>Latency-critical applications (chatbots)</li>
+              <li>Zero-shot scenarios</li>
+              <li>General-purpose deployment</li>
+              <li>When training budget is tight</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6.3 Encoder-Decoder (T5) -->
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+        <h3 class="title is-4" style="color: #1e3a8a; margin-bottom: 1.5rem;">6.3 Encoder-Decoder (T5): The Perfectionist</h3>
+        <div class="columns">
+          <div class="column is-half">
+            <h4 style="color: #1e3a8a; font-weight: 700; margin-bottom: 0.5rem;">✅ Strengths</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li><strong>Best task accuracy</strong> (BoolQ: 77.1%)</li>
+              <li><strong>Lowest inference energy</strong> (1.14 J/tok)</li>
+              <li>Strongest few-shot learning</li>
+              <li>Efficient long-input processing</li>
+            </ul>
+            <h4 style="color: #1e3a8a; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem;">❌ Weaknesses</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li>Slowest training (536s, +77%)</li>
+              <li>Higher inference latency (TTFT: 23ms)</li>
+            </ul>
+          </div>
+          <div class="column is-half">
+            <h4 style="color: #1e3a8a; font-weight: 700; margin-bottom: 0.5rem;">🎯 Optimal Use Cases</h4>
+            <ul style="margin-left: 1.5rem; line-height: 1.8;">
+              <li><strong>Quality-critical tasks</strong></li>
+              <li><strong>Energy-constrained deployment</strong></li>
+              <li>Document summarization</li>
+              <li>Batch processing</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Section 6 -->
+
+<!-- Section 7: Decision Framework -->
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">7. Decision Framework for Practitioners</h2>
+      
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">7.1 Constraint-based Architecture Selection</h3>
+        
+        <!-- Scenario 1 -->
+        <div class="box" style="background: #f0f9ff; border-left: 4px solid #3b82f6; margin-bottom: 2rem;">
+          <h4 style="color: #1e3a8a; font-weight: 700; margin-bottom: 1rem;">Scenario 1: Cloud Chatbot (Latency-constrained)</h4>
+          <p style="line-height: 1.7;"><strong>Optimal Choice: Decoder-only (GPT)</strong></p>
+          <p style="margin-top: 0.5rem;">TTFT requirement &lt;100ms → GPT-2's 10ms TTFT ✓</p>
+          <p style="margin-top: 0.5rem; padding: 1rem; background: #fef3c7; border-radius: 6px;">
+            <strong>Trade-off:</strong> Pay 2× more in electricity for 2.3× faster response
+              </p>
+            </div>
+
+        <!-- Scenario 2 -->
+        <div class="box" style="background: #f0fdf4; border-left: 4px solid #10b981; margin-bottom: 2rem;">
+          <h4 style="color: #14532d; font-weight: 700; margin-bottom: 1rem;">Scenario 2: Mobile Summarization (Energy-constrained)</h4>
+          <p style="line-height: 1.7;"><strong>Optimal Choice: Encoder-Decoder (T5)</strong></p>
+          <p style="margin-top: 0.5rem;">Battery budget 1000J/day → T5: 17 summaries/day vs GPT-2: 8/day</p>
+          <p style="margin-top: 0.5rem; padding: 1rem; background: #fef3c7; border-radius: 6px;">
+            <strong>Trade-off:</strong> 1.5× slower but 2× battery savings
+          </p>
+          </div>
+
+        <!-- Scenario 3 -->
+        <div class="box" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+          <h4 style="color: #78350f; font-weight: 700; margin-bottom: 1rem;">Scenario 3: Research Benchmark (Quality-constrained)</h4>
+          <p style="line-height: 1.7;"><strong>Optimal Choice: Encoder-Decoder (T5-Large)</strong></p>
+          <p style="margin-top: 0.5rem;">Target accuracy &gt;70% → T5's 16pp advantage justifies training cost</p>
+        </div>
+      </div>
+
+      <!-- The E³ Trilemma -->
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);">
+        <h3 class="title is-4" style="color: #78350f; margin-bottom: 1.5rem;">7.2 The E³ Trilemma</h3>
+        <div style="padding: 1.5rem; background: white; border: 3px solid #f59e0b; border-radius: 8px; margin-bottom: 1.5rem; text-align: center;">
+          <h4 style="color: #78350f; font-weight: 700; font-size: 1.3rem;">⚠️ Fundamental Law</h4>
+          <p style="font-size: 1.2rem; margin-top: 0.5rem;">You can optimize at most <strong>TWO of THREE</strong> dimensions</p>
+        </div>
+        
+        <div class="table-container">
+          <table class="table is-striped is-fullwidth">
+            <thead>
+              <tr>
+                <th>Optimize</th>
+                <th>Sacrifice</th>
+                <th>Architecture</th>
+                <th>Use Case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>E₁ + E₂</td>
+                <td>E₃</td>
+                <td>Lightweight Decoder</td>
+                <td>Resource-constrained serving</td>
+              </tr>
+              <tr>
+                <td>E₁ + E₃</td>
+                <td>E₂</td>
+                <td>GPT-2/GPT-3</td>
+                <td>Cloud chatbots</td>
+              </tr>
+              <tr>
+                <td>E₂ + E₃</td>
+                <td>E₁</td>
+                <td>T5</td>
+                <td>Edge devices, sustainability</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Section 7 -->
 
 
 
+<!-- Section 8: Broader Implications -->
+<section class="hero is-small is-light">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">8. Broader Implications</h2>
+      
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">8.1 Rethinking "Efficiency" in AI</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p>Current benchmarks conflate three distinct concepts:</p>
+          <ol style="margin-left: 1.5rem;">
+            <li><strong>Computational Efficiency:</strong> FLOPs, memory bandwidth</li>
+            <li><strong>Time Efficiency:</strong> Latency, throughput</li>
+            <li><strong>Energy Efficiency:</strong> Joules per task</li>
+          </ol>
+          <div style="margin-top: 1.5rem; padding: 1.5rem; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 6px;">
+            <strong>Our contribution:</strong> Demonstrating these are <strong>orthogonal</strong>. T5 is computationally expensive (220M params, dual attention) yet energy-efficient (1.14 J/tok).
+          </div>
+          <p style="margin-top: 1rem;"><strong>Call to Action:</strong> Report all three metrics separately. "Efficient" is meaningless without specifying the dimension.</p>
+        </div>
+      </div>
 
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">8.2 The Carbon Cost of Speed</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <div style="padding: 1.5rem; background: #fecaca; border-left: 4px solid #ef4444; border-radius: 6px; margin-bottom: 1.5rem;">
+            <p><strong>Conventional Wisdom:</strong> "Faster models are more efficient"</p>
+            <p style="margin-top: 0.5rem;"><strong>Our Finding:</strong> <strong>FALSE</strong>. GPT-2 is 53% faster but 110% more wasteful.</p>
+          </div>
+          <p><strong>Sustainability Implication:</strong> Optimizing for latency (user experience) directly conflicts with carbon reduction goals.</p>
+          <p style="margin-top: 1rem;"><strong>Policy Suggestion:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>Datacenter deployment: Favor T5 (lower OpEx, lower carbon)</li>
+            <li>Edge deployment: Favor GPT (battery already limited, speed matters)</li>
+            <li>Hybrid: Route to T5 for batch, GPT for interactive</li>
+          </ul>
+        </div>
+      </div>
 
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">8.3 The Architecture War Through the E³ Lens</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <div style="padding: 1.5rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; margin-bottom: 1.5rem;">
+            <p><strong>Common Narrative:</strong> "Decoder-only has won the architecture war" (GPT, LLaMA, Qwen dominate)</p>
+            <p style="margin-top: 0.5rem;"><strong>Our Reframing:</strong> The war isn't over; it's <strong>scenario-dependent</strong>.</p>
+          </div>
+          
+          <h4>Why Decoder-only Dominates Commercially:</h4>
+          <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li><strong>Versatility:</strong> One model, many tasks</li>
+            <li><strong>Zero-shot:</strong> Impressive demos without task-specific fine-tuning</li>
+            <li><strong>Scalability:</strong> Proven to 1T+ parameters</li>
+            <li><strong>Ecosystem:</strong> HuggingFace, OpenAI standardization</li>
+          </ul>
+
+          <h4 style="margin-top: 1.5rem;">Why Alternatives Remain Relevant:</h4>
+          <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li><strong>T5 for sustainability:</strong> 52% energy savings at 1M+ scale</li>
+            <li><strong>BERT for classification:</strong> Still SOTA on GLUE leaderboards</li>
+            <li><strong>Specialized domains:</strong> Medical (BioBERT), legal (LegalBERT)</li>
+          </ul>
+
+          <p style="margin-top: 1.5rem; padding: 1.5rem; background: #dbeafe; border-radius: 6px;">
+            <strong>Prediction:</strong> Architectural <strong>diversification</strong> as deployment constraints vary:
+            Datacenters → T5 (energy cost rising) | Phones → Encoder-only | Cloud API → Decoder-only
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Section 8 -->
+
+<!-- Section 9: Limitations and Future Work -->
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">9. Limitations and Future Work</h2>
+      
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">9.1 Experimental Limitations</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <ol style="margin-left: 1.5rem;">
+            <li><strong>Parameter scale:</strong> Limited to &lt;2B parameters (V100 GPU constraint) — Trade-offs may shift at 7B, 70B, 1T scales</li>
+            <li><strong>Task coverage:</strong> Focused on NLU + generation — Missing: Code generation, multimodal, reasoning</li>
+            <li><strong>Hardware specificity:</strong> V100 results; A100/H100 may differ due to varying tensor cores and memory bandwidth</li>
+            <li><strong>Optimization parity:</strong> All models use eager attention — Production systems use FlashAttention, kernel fusion</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">9.2 Future Directions</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p><strong>Short-term:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>Extend to 7B-70B models (LLaMA-2, Qwen-2.5)</li>
+            <li>Add quantization (4-bit, 8-bit) and measure energy impact</li>
+            <li>Multi-GPU scaling laws</li>
+          </ul>
+
+          <p style="margin-top: 1.5rem;"><strong>Medium-term:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>Hybrid architectures (Perceiver IO, Universal Transformer)</li>
+            <li>MoE integration (Switch Transformer energy profile)</li>
+            <li>Carbon-aware training (time-shifting to renewable energy windows)</li>
+          </ul>
+
+          <p style="margin-top: 1.5rem;"><strong>Long-term:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>Automated architecture search under E³ constraints</li>
+            <li>Dynamic architectures (mode-switching based on input)</li>
+            <li>Hardware co-design (custom ASICs for T5 energy efficiency)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Section 9 -->
+
+<!-- Section 10: Conclusions -->
+<section class="hero is-small is-light">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">10. Conclusions</h2>
+      
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">10.1 Key Findings</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <ol style="margin-left: 1.5rem;">
+            <li style="margin-bottom: 1rem;">
+              <strong>No Universal Winner:</strong> Each architecture is Pareto-optimal under different constraints
+              <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                <li>GPT-2: Best E₁ (speed) and E₂ (training energy)</li>
+                <li>T5: Best E₃ (accuracy) and E₂ (inference energy)</li>
+                <li>BERT: Best for pure classification (when generation unneeded)</li>
+              </ul>
+            </li>
+            
+            <li style="margin-bottom: 1rem;">
+              <strong>Efficiency ≠ Energy:</strong> GPT-2 is 53% faster but 110% more energy-intensive
+              <div style="margin-top: 0.5rem; padding: 1rem; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px;">
+                This decoupling is the report's most important empirical contribution
+              </div>
+            </li>
+            
+            <li style="margin-bottom: 1rem;">
+              <strong>Scale Reverses Priorities:</strong> Training energy becomes negligible at 1M+ inferences — T5 saves 52% lifecycle energy despite 30% higher training cost
+            </li>
+            
+            <li>
+              <strong>The E³ Trilemma:</strong> Cannot optimize all three dimensions simultaneously — Practitioners must make explicit trade-off decisions
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="box" style="margin-bottom: 3rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">10.2 Practical Recommendations</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p><strong>For Researchers:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>Report E₁, E₂, E₃ separately (not a single "efficiency" number)</li>
+            <li>Measure lifecycle energy, not just training FLOPs</li>
+            <li>Consider deployment context when benchmarking</li>
+          </ul>
+
+          <p style="margin-top: 1.5rem;"><strong>For Engineers:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>Use decision tree: Latency-critical → GPT, Energy-critical → T5, Classification → BERT</li>
+            <li>Measure actual power draw (NVML), not estimated FLOPs</li>
+            <li>For scaling: Inference energy dominates; optimize E₂ over E₁</li>
+          </ul>
+
+          <p style="margin-top: 1.5rem;"><strong>For Policymakers:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>Require energy reporting in AI benchmarks (like MLPerf)</li>
+            <li>Incentivize sustainable architectures (carbon pricing)</li>
+            <li>Fund research in energy-efficient inference</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+        <h3 class="title is-4" style="color: #1e3a8a; margin-bottom: 1.5rem;">10.3 The Future of Architecture Wars</h3>
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <div style="padding: 1.5rem; background: white; border-left: 4px solid #3b82f6; border-radius: 6px; margin-bottom: 1.5rem; text-align: center;">
+            <h4 style="color: #1e3a8a; font-weight: 700; font-size: 1.2rem;">The war is not over—it's multi-dimensional.</h4>
+          </div>
+          
+          <p>As deployment diversifies:</p>
+          <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+            <li><strong>Cloud:</strong> Decoder-only for general-purpose APIs</li>
+            <li><strong>Edge:</strong> Encoder-only for classification, lightweight decoders for generation</li>
+            <li><strong>Datacenter batch:</strong> Encoder-decoder for quality + sustainability</li>
+            <li><strong>Research:</strong> Hybrid/MoE architectures exploring new frontiers</li>
+          </ul>
+
+          <p style="margin-top: 1.5rem; padding: 1.5rem; background: #fef3c7; border-radius: 6px; text-align: center;">
+            <strong>The optimal strategy:</strong> Maintain an <strong>architectural portfolio</strong> optimized for different points on the E³ Pareto frontier.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Section 10 -->
+
+<!-- Data and Code Availability -->
+<section class="hero is-small">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">11. Data and Code Availability</h2>
+      
+      <div class="box" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <div class="content" style="font-size: 1rem; line-height: 1.7;">
+          <p><strong>Framework:</strong> E³ Mini-Benchmark (open-source)</p>
+          <p><strong>Hardware:</strong> NVIDIA Tesla V100-SXM2-32GB</p>
+          <p><strong>Data:</strong> All experimental results, CSV aggregations, and visualization code available in repository</p>
+          <p><strong>Reproducibility:</strong> Configuration files, training scripts, and measurement code provided</p>
+          
+          <div style="margin-top: 2rem; padding: 1.5rem; background: #f0f9ff; border-radius: 8px;">
+            <h4 style="color: #1e3a8a; font-weight: 700; margin-bottom: 0.5rem;">📊 Experimental Summary</h4>
+            <ul style="margin-left: 1.5rem;">
+              <li><strong>Report Date:</strong> December 1, 2025</li>
+              <li><strong>Experimental Period:</strong> November 2024 - November 2025</li>
+              <li><strong>Total Experiments:</strong> 150+ training runs, 500+ inference benchmarks</li>
+              <li><strong>Total Energy Measured:</strong> ~2.5 kWh (training), ~0.8 kWh (inference)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End Data Availability -->
+
+<!-- Appendices -->
+<section class="hero is-small is-light">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <h2 class="title is-3 has-text-centered" style="margin-bottom: 2.5rem;">Appendices</h2>
+      
+      <!-- Appendix A -->
+      <div class="box" style="margin-bottom: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">Appendix A: Complete Model List</h3>
+        <div class="content" style="font-size: 0.95rem; line-height: 1.7;">
+          <p><strong>Encoder-only (7 models):</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>bert-base-uncased (110M), bert-large-uncased (340M)</li>
+            <li>roberta-base (125M)</li>
+            <li>distilbert-base (66M)</li>
+            <li>deberta-v3-base (183M)</li>
+          </ul>
+
+          <p style="margin-top: 1rem;"><strong>Decoder-only (7 models):</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>gpt2 (124M), gpt2-medium (355M), gpt2-large (774M)</li>
+            <li>llama-3.2-1b (1B), llama-3.2-3b (3B)</li>
+            <li>qwen2.5-0.5b (494M), qwen2.5-1.5b (1.5B)</li>
+          </ul>
+
+          <p style="margin-top: 1rem;"><strong>Encoder-Decoder (5 models):</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>t5-base (220M), t5-large (770M)</li>
+            <li>flan-t5-base (250M), flan-t5-large (780M)</li>
+            <li>bart-base (140M)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Appendix B -->
+      <div class="box" style="margin-bottom: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <h3 class="title is-4" style="color: #2d3748; margin-bottom: 1.5rem;">Appendix B: Energy Calculation Methodology</h3>
+        <div class="content" style="font-size: 0.95rem; line-height: 1.7;">
+          <p>Real-time GPU power monitoring using NVIDIA Management Library (NVML):</p>
+          <pre style="background: #f7fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; margin-top: 1rem;"><code>import pynvml
+pynvml.nvmlInit()
+handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+# During training/inference
+power_watts = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0
+energy_joules = power_watts * duration_seconds
+energy_kwh = energy_joules / 3_600_000</code></pre>
+          <ul style="margin-left: 1.5rem; margin-top: 1rem;">
+            <li><strong>Sampling Rate:</strong> 100ms (10 Hz)</li>
+            <li><strong>Precision:</strong> ±5W (NVML specification)</li>
+            <li><strong>Integration:</strong> Trapezoidal rule</li>
+          </ul>
+        </div>
+      </div>
+
+<!-- End Appendices -->
 
 <!-- Paper poster - Commented out 
 <section class="hero is-small is-light">
@@ -528,13 +1674,12 @@
           <span class="copy-text">Copy</span>
         </button>
       </div>
-      <pre id="bibtex-code"><code>@article{E3MiniBenchmark2025,
-  title={E³-Mini Benchmark: A Full-Dimensional Evaluation of Efficiency, Energy, and Effectiveness in Transformer Architectures},
-  author={Your Name and Mentor Name and Collaborator Name},
-  journal={Machine Learning Research},
+      <pre id="bibtex-code"><code>@article{e3benchmark2025,
+  title={The End Game of Architecture Wars? An E³ Trade-off Analysis},
+  author={Boyu Liu},
+  affiliation={University of Illinois at Urbana-Champaign},
   year={2025},
-  url={https://your-domain.com/e3-benchmark},
-  note={An empirical study comparing Encoder-only, Decoder-only, and Encoder-Decoder architectures across three critical dimensions}
+  note={Comprehensive comparison of Transformer architectures across Efficiency, Energy, and Effectiveness dimensions}
 }</code></pre>
     </div>
 </section>

@@ -1,0 +1,246 @@
+{
+  "title": "Inference E\u00b3 Trade-off Space",
+  "subtitle": "Latency \u00d7 Energy \u00d7 Effectiveness",
+  "axes": {
+    "x": {
+      "title": "TTFT (ms)",
+      "subtitle": "\u2190 Better (Lower Latency)",
+      "type": "linear"
+    },
+    "y": {
+      "title": "Energy per Sample (J)",
+      "subtitle": "\u2190 Better (Less Energy)",
+      "type": "linear"
+    },
+    "z": {
+      "title": "Accuracy (%)",
+      "subtitle": "\u2192 Better (Higher Accuracy)",
+      "type": "linear"
+    }
+  },
+  "traces": [
+    {
+      "name": "Encoder-only",
+      "type": "scatter3d",
+      "mode": "markers+text",
+      "marker": {
+        "size": 10,
+        "color": "#2ecc71",
+        "symbol": "circle",
+        "line": {
+          "color": "white",
+          "width": 1
+        },
+        "opacity": 0.8
+      },
+      "x": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "y": [
+        14.649992601394654,
+        14.236563687245052,
+        14.446938371340433
+      ],
+      "z": [
+        54.70472586763029,
+        65.19204242921319,
+        55.36965634472464
+      ],
+      "text": [
+        "bert-base-uncased",
+        "distilbert-base-uncased",
+        "roberta-base"
+      ],
+      "hovertemplate": "<b>%{text}</b><br>TTFT: %{x:.2f} ms<br>Energy: %{y:.2f} J<br>Accuracy: %{z:.2f}%<br>Throughput: 0.0 tok/s<br><extra></extra>",
+      "textposition": "top center",
+      "textfont": {
+        "size": 9,
+        "color": "#2ecc71"
+      },
+      "customdata": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "name": "Decoder-only",
+      "type": "scatter3d",
+      "mode": "markers+text",
+      "marker": {
+        "size": 10,
+        "color": "#e74c3c",
+        "symbol": "diamond",
+        "line": {
+          "color": "white",
+          "width": 1
+        },
+        "opacity": 0.8
+      },
+      "x": [
+        10.22728681564331,
+        16.89078410466512,
+        24.319724241892498,
+        27.334455649058025
+      ],
+      "y": [
+        120.78015670702854,
+        253.9998198518325,
+        275.5101450163521,
+        376.13779326797925
+      ],
+      "z": [
+        52.01132612701448,
+        69.99126727237733,
+        68.56491163256148,
+        75.09557351450012
+      ],
+      "text": [
+        "gpt2",
+        "llama-3.2-1b",
+        "qwen2.5-0.5b",
+        "qwen2.5-1.5b"
+      ],
+      "hovertemplate": "<b>%{text}</b><br>TTFT: %{x:.2f} ms<br>Energy: %{y:.2f} J<br>Accuracy: %{z:.2f}%<br>Throughput: 94.8 tok/s<br><extra></extra>",
+      "textposition": "top center",
+      "textfont": {
+        "size": 9,
+        "color": "#e74c3c"
+      },
+      "customdata": [
+        [
+          94.82522947420057,
+          10.05336281393661
+        ],
+        [
+          56.8289563924567,
+          16.61808474534223
+        ],
+        [
+          40.719735380769976,
+          24.19185597880357
+        ],
+        [
+          35.589631897967806,
+          27.205840665466933
+        ]
+      ]
+    },
+    {
+      "name": "Encoder-Decoder",
+      "type": "scatter3d",
+      "mode": "markers+text",
+      "marker": {
+        "size": 10,
+        "color": "#3498db",
+        "symbol": "square",
+        "line": {
+          "color": "white",
+          "width": 1
+        },
+        "opacity": 0.8
+      },
+      "x": [
+        8.629989624023438,
+        33.10457865397135,
+        48.19819132486979,
+        22.88512388865153,
+        47.51870632171631
+      ],
+      "y": [
+        14.439103642781575,
+        42.13772060259183,
+        72.21175942421755,
+        57.207347293366986,
+        94.11333576287826
+      ],
+      "z": [
+        62.713759634137965,
+        64.67679539419949,
+        60.8086100996017,
+        58.208391983484155,
+        60.79082119775426
+      ],
+      "text": [
+        "bart-base",
+        "flan-t5-base",
+        "flan-t5-large",
+        "t5-base",
+        "t5-large"
+      ],
+      "hovertemplate": "<b>%{text}</b><br>TTFT: %{x:.2f} ms<br>Energy: %{y:.2f} J<br>Accuracy: %{z:.2f}%<br>Throughput: 180.5 tok/s<br><extra></extra>",
+      "textposition": "top center",
+      "textfont": {
+        "size": 9,
+        "color": "#3498db"
+      },
+      "customdata": [
+        [
+          180.5435280082952,
+          4.975858959886763
+        ],
+        [
+          44.454120922051736,
+          20.60068930038298
+        ],
+        [
+          28.586521401499088,
+          30.57664603362849
+        ],
+        [
+          62.208315693088856,
+          14.548575743291174
+        ],
+        [
+          30.06078026996436,
+          30.286986391290245
+        ]
+      ]
+    }
+  ],
+  "metadata": {
+    "total_models": 12,
+    "architectures": {
+      "encoder": 3,
+      "decoder": 4,
+      "encdec": 5
+    },
+    "statistics": {
+      "ttft_range": {
+        "min": 0.0,
+        "max": 48.19819132486979,
+        "mean": 19.92573671870761
+      },
+      "energy_range": {
+        "min": 14.236563687245052,
+        "max": 376.13779326797925,
+        "mean": 112.48922301908406
+      },
+      "accuracy_range": {
+        "min": 52.01132612701448,
+        "max": 75.09557351450012,
+        "mean": 62.34399012476659
+      }
+    },
+    "key_findings": {
+      "efficiency_energy_decoupling": {
+        "description": "GPT-2 is 1.5\u00d7 faster but uses 2.1\u00d7 more energy than T5",
+        "gpt2_throughput": 94.82522947420057,
+        "t5_throughput": 62.208315693088856,
+        "gpt2_energy": 120.78015670702854,
+        "t5_energy": 57.207347293366986
+      }
+    }
+  }
+}
